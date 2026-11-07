@@ -11,13 +11,11 @@ import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.options
 public class WireMockConfig implements BeforeAllCallback, AfterAllCallback {
 
     private WireMockServer wireMockServer;
-    private String host;
-    private int port;
 
     @Override
     public void beforeAll(ExtensionContext context) {
-        host = Props.get("host", "localhost");
-        port = Props.getInt("port", 8888);
+        String host = Props.get("host", "localhost");
+        int port = Props.getInt("port", 8888);
 
         wireMockServer = new WireMockServer(options().port(port));
         wireMockServer.start();
