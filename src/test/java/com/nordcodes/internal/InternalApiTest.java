@@ -238,4 +238,72 @@ public class InternalApiTest {
             response.then().statusCode(401);
         });
     }
+
+    @Test
+    @Order(8)
+    @Story("Валидация: неверный формат токена")
+    @Severity(SeverityLevel.CRITICAL)
+    @Description("Проверяем, что приложение отклоняет токены, не соответствующие регулярке ^[0-9A-F]{32}$")
+    void invalidTokenFormat() {
+        String invalidToken = "invalid-token-Gz";
+
+        Response response = sendAction(invalidToken, "LOGIN");
+
+        Allure.step("Проверка ответа: ожидаем 400 Bad Request с описанием ошибки валидации", () -> {
+            response.then()
+                    .statusCode(400)
+                    .body("result", equalTo("ERROR"))
+                    .body("message", containsString("должно соответствовать"));
+        });
+    }
+
+    @Test
+    @Order(9)
+    @Story("Сбой внешнего сервиса: ошибка 500 при LOGIN")
+    @Severity(SeverityLevel.BLOCKER)
+    @Description("Если /auth возвращает 500, приложение не должно сохранять токен")
+    void loginFailsWhenAuthMockReturns500() {
+        String token = randomToken();
+
+        Allure.step("Настройка мока: /auth возвращает 500 Internal Server Error", () -> {
+            stubFor(post(urlEqualTo("/auth")).willReturn(aResponse().withStatus(500)));
+        });
+
+        Response response = sendAction(token, "LOGIN");
+
+        Allure.step("Проверка ответа: ожидаем 500", () -> {
+            response.then().statusCode(500);
+        });
+
+        Response actionResponse = sendAction(token, "ACTION");
+        Allure.step("Проверка, что токен не сохранился (ACTION возвращает 403)", () -> {
+            actionResponse.then()
+                    .statusCode(403)
+                    .body("result", equalTo("ERROR"));
+        });
+    }
+
+    @Test
+    @Order(10)
+    @Story("Сбой внешнего сервиса: ошибка 500 при ACTION")
+    @Severity(SeverityLevel.CRITICAL)
+    @Description("Если /doAction возвращает 500, приложение должно корректно вернуть ошибку клиенту")
+    void actionFailsWhenDoActionMockReturns500() {
+        String token = randomToken();
+
+        Allure.step("Настройка моков: /auth -> 200, /doAction -> 500", () -> {
+            stubFor(post(urlEqualTo("/auth")).willReturn(aResponse().withStatus(200)));
+            stubFor(post(urlEqualTo("/doAction")).willReturn(aResponse().withStatus(500)));
+        });
+
+        sendAction(token, "LOGIN").then().statusCode(200);
+
+        Response response = sendAction(token, "ACTION");
+
+        Allure.step("Проверка ответа: ожидаем 500", () -> {
+            response.then()
+                    .statusCode(500)
+                    .body("result", equalTo("ERROR"));
+        });
+    }
 }
