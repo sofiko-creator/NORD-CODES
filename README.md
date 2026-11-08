@@ -1,19 +1,27 @@
 # NORD-CODES
 
-Задача покрыть тестами java-приложение
+Проект автотестов для Java-приложения (Spring Boot).
+Цель - покрытие тестами REST API, интеграции с внешним сервисом (мок) и проверки аутентификации.
 
-## Запуск
-### 1. Убедиться, что Maven видит Java 17
-mvn -version
+## Стек технологий
+*   **Java 17** (JDK)
+*   **Maven** (сборка)
+*   **JUnit 5** (тест-раннер)
+*   **WireMock** (мокирование внешнего сервиса)
+*   **REST Assured** (HTTP-клиент для тестов)
+*   **Allure** (отчётность)
 
-### 2. Собрать и прогнать тесты
-mvn clean test
+## Подготовка
+1. Установить Java 17 (проверить: `java -version`).
+2. Установить Maven (проверить: `mvn -version`).
 
-### 3. Собрать jar
-mvn clean package
+## Порядок запуска
+1. **Запустить тестируемое приложение** в отдельном терминале:
+   `java -jar -Dsecret=qazWSXedc -Dmock=http://localhost:8888/ internal-0.0.1-SNAPSHOT.jar`
+   (оставить терминал открытым, дождаться строки "Started AqaApplication")
 
-### 4. Посмотреть Allure-отчёт (локальный сервер)
-mvn allure:serve
+2. **Прогнать тесты** (в другом терминале):
+   `mvn clean test`
 
-### 5. Запустить jar — теперь без ошибки UnsupportedClassVersionError
-java -jar -Dsecret=qazWSXedc -Dmock=http://localhost:8888/ target/internal-0.0.1-SNAPSHOT.jar
+3. **Посмотреть Allure-отчёт**:
+   `mvn allure:serve`
