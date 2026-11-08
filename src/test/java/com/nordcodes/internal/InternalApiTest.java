@@ -52,8 +52,8 @@ public class InternalApiTest {
         resetAllRequests();
     }
 
-    @Step("Отправка запроса с действием: {action}")
     private Response sendAction(String token, String action) {
+        Allure.step("Отправка запроса с действием: " + action);
         return RestAssured.given()
                 .contentType(ContentType.URLENC)
                 .accept(ContentType.JSON)
@@ -62,19 +62,21 @@ public class InternalApiTest {
                 .formParam("action", action)
                 .when()
                 .post("/endpoint");
+
     }
 
-    @Step("Проверка, что внешний сервис вызван: {path}")
     private void verifyExternalCall(String path, String token) {
-        verify(postRequestedFor(urlEqualTo(path))
-                .withHeader("Content-Type", containing("application/x-www-form-urlencoded"))
-                .withHeader("Accept", containing("application/json"))
-                .withRequestBody(containing("token=" + token)));
+        Allure.step("Проверка, что внешний сервис вызван: " + path, () -> {
+            verify(postRequestedFor(urlEqualTo(path))
+                    .withHeader("Content-Type", containing("application/x-www-form-urlencoded"))
+                    .withHeader("Accept", containing("application/json"))
+                    .withRequestBody(containing("token=" + token)));
+        });
     }
 
-    @Step("Проверка, что внешний сервис НЕ вызывался: {path}")
     private void verifyExternalNotCalled() {
-        verify(0, postRequestedFor(urlEqualTo("/doAction")));
+        Allure.step("Проверка, что внешний сервис НЕ вызывался: /doAction", () ->
+                verify(0, postRequestedFor(urlEqualTo("/doAction"))));
     }
 
     @Test
