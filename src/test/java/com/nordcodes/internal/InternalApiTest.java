@@ -6,6 +6,7 @@ import com.nordcodes.internal.config.WireMockConfig;
 import io.qameta.allure.*;
 import io.restassured.RestAssured;
 import io.restassured.http.ContentType;
+import io.restassured.response.Response;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 
@@ -51,6 +52,31 @@ public class InternalApiTest {
         resetAllRequests();
     }
 
+    @Step("Отправка запроса с действием: {action}")
+    private Response sendAction(String token, String action) {
+        return RestAssured.given()
+                .contentType(ContentType.URLENC)
+                .accept(ContentType.JSON)
+                .header("X-Api-Key", apiKey)
+                .formParam("token", token)
+                .formParam("action", action)
+                .when()
+                .post("/endpoint");
+    }
+
+    @Step("Проверка, что внешний сервис вызван: {path}")
+    private void verifyExternalCall(String path, String token) {
+        verify(postRequestedFor(urlEqualTo(path))
+                .withHeader("Content-Type", containing("application/x-www-form-urlencoded"))
+                .withHeader("Accept", containing("application/json"))
+                .withRequestBody(containing("token=" + token)));
+    }
+
+    @Step("Проверка, что внешний сервис НЕ вызывался: {path}")
+    private void verifyExternalNotCalled() {
+        verify(0, postRequestedFor(urlEqualTo("/doAction")));
+    }
+
     @Test
     @Order(1)
     @Story("LOGIN: успешная аутентификация")
@@ -59,25 +85,19 @@ public class InternalApiTest {
     void loginSuccess() {
         String token = randomToken();
 
-        stubFor(post(urlEqualTo("/auth"))
-                .willReturn(aResponse().withStatus(200)));
+        Allure.step("Настройка мока: /auth возвращает 200", () -> {
+            stubFor(post(urlEqualTo("/auth")).willReturn(aResponse().withStatus(200)));
+        });
 
-        RestAssured.given()
-                .contentType(ContentType.URLENC)
-                .accept(ContentType.JSON)
-                .header("X-Api-Key", apiKey)
-                .formParam("token", token)
-                .formParam("action", "LOGIN")
-                .when()
-                .post("/endpoint")
-                .then()
-                .statusCode(200)
-                .body("result", equalTo("OK"));
+        Response response = sendAction(token, "LOGIN");
 
-        verify(postRequestedFor(urlEqualTo("/auth"))
-                .withHeader("Content-Type", containing("application/x-www-form-urlencoded"))
-                .withHeader("Accept", containing("application/json"))
-                .withRequestBody(containing("token=" + token)));
+        Allure.step("Проверка ответа приложения: 200 и result=OK", () -> {
+            response.then()
+                    .statusCode(200)
+                    .body("result", equalTo("OK"));
+        });
+
+        verifyExternalCall("/auth", token);
     }
 
     @Test
@@ -88,30 +108,19 @@ public class InternalApiTest {
     void loginTwiceSameToken() {
         String token = randomToken();
 
-        stubFor(post(urlEqualTo("/auth"))
-                .willReturn(aResponse().withStatus(200)));
+        Allure.step("Настройка мока: /auth возвращает 200", () -> {
+            stubFor(post(urlEqualTo("/auth")).willReturn(aResponse().withStatus(200)));
+        });
 
-        RestAssured.given()
-                .contentType(ContentType.URLENC)
-                .header("X-Api-Key", apiKey)
-                .formParam("token", token)
-                .formParam("action", "LOGIN")
-                .when()
-                .post("/endpoint")
-                .then()
-                .statusCode(200)
-                .body("result", equalTo("OK"));
+        Response firstLogin = sendAction(token, "LOGIN");
+        Allure.step("Первая аутентификация: ожидаем 200 OK", () -> {
+            firstLogin.then().statusCode(200).body("result", equalTo("OK"));
+        });
 
-        RestAssured.given()
-                .contentType(ContentType.URLENC)
-                .header("X-Api-Key", apiKey)
-                .formParam("token", token)
-                .formParam("action", "LOGIN")
-                .when()
-                .post("/endpoint")
-                .then()
-                .statusCode(409)
-                .body("result", equalTo("ERROR"));
+        Response secondLogin = sendAction(token, "LOGIN");
+        Allure.step("Повторная аутентификация: ожидаем 409 Conflict", () -> {
+            secondLogin.then().statusCode(409).body("result", equalTo("ERROR"));
+        });
     }
 
     @Test
@@ -122,37 +131,22 @@ public class InternalApiTest {
     void actionAfterLogin() {
         String token = randomToken();
 
-        stubFor(post(urlEqualTo("/auth"))
-                .willReturn(aResponse().withStatus(200)));
-        stubFor(post(urlEqualTo("/doAction"))
-                .willReturn(aResponse().withStatus(200)));
+        Allure.step("Настройка моков: /auth и /doAction возвращают 200", () -> {
+            stubFor(post(urlEqualTo("/auth")).willReturn(aResponse().withStatus(200)));
+            stubFor(post(urlEqualTo("/doAction")).willReturn(aResponse().withStatus(200)));
+        });
 
-        RestAssured.given()
-                .contentType(ContentType.URLENC)
-                .header("X-Api-Key", apiKey)
-                .formParam("token", token)
-                .formParam("action", "LOGIN")
-                .when()
-                .post("/endpoint")
-                .then()
-                .statusCode(200)
-                .body("result", equalTo("OK"));
+        Response login = sendAction(token, "LOGIN");
+        Allure.step("Аутентификация токена: ожидаем 200 OK", () -> {
+            login.then().statusCode(200).body("result", equalTo("OK"));
+        });
 
-        RestAssured.given()
-                .contentType(ContentType.URLENC)
-                .header("X-Api-Key", apiKey)
-                .formParam("token", token)
-                .formParam("action", "ACTION")
-                .when()
-                .post("/endpoint")
-                .then()
-                .statusCode(200)
-                .body("result", equalTo("OK"));
+        Response action = sendAction(token, "ACTION");
+        Allure.step("Выполнение действия: ожидаем 200 OK", () -> {
+            action.then().statusCode(200).body("result", equalTo("OK"));
+        });
 
-        verify(postRequestedFor(urlEqualTo("/doAction"))
-                .withHeader("Content-Type", containing("application/x-www-form-urlencoded"))
-                .withHeader("Accept", containing("application/json"))
-                .withRequestBody(containing("token=" + token)));
+        verifyExternalCall("/doAction", token);
     }
 
     @Test
@@ -162,19 +156,16 @@ public class InternalApiTest {
     void actionWithoutLogin() {
         String token = randomToken();
 
-        RestAssured.given()
-                .contentType(ContentType.URLENC)
-                .header("X-Api-Key", apiKey)
-                .formParam("token", token)
-                .formParam("action", "ACTION")
-                .when()
-                .post("/endpoint")
-                .then()
-                .statusCode(403)
-                .body("result", equalTo("ERROR"))
-                .body("message", containsString("not found"));
+        Response response = sendAction(token, "ACTION");
 
-        verify(0, postRequestedFor(urlEqualTo("/doAction")));
+        Allure.step("Проверка ответа: ожидаем 403 ERROR с сообщением 'not found'", () -> {
+            response.then()
+                    .statusCode(403)
+                    .body("result", equalTo("ERROR"))
+                    .body("message", containsString("not found"));
+        });
+
+        verifyExternalNotCalled();
     }
 
     @Test
@@ -184,41 +175,24 @@ public class InternalApiTest {
     void logoutRemovesToken() {
         String token = randomToken();
 
-        stubFor(post(urlEqualTo("/auth"))
-                .willReturn(aResponse().withStatus(200)));
+        Allure.step("Настройка мока: /auth возвращает 200", () -> {
+            stubFor(post(urlEqualTo("/auth")).willReturn(aResponse().withStatus(200)));
+        });
 
-        RestAssured.given()
-                .contentType(ContentType.URLENC)
-                .header("X-Api-Key", apiKey)
-                .formParam("token", token)
-                .formParam("action", "LOGIN")
-                .when()
-                .post("/endpoint")
-                .then()
-                .statusCode(200)
-                .body("result", equalTo("OK"));
+        Response login = sendAction(token, "LOGIN");
+        Allure.step("Аутентификация токена: ожидаем 200 OK", () -> {
+            login.then().statusCode(200).body("result", equalTo("OK"));
+        });
 
-        RestAssured.given()
-                .contentType(ContentType.URLENC)
-                .header("X-Api-Key", apiKey)
-                .formParam("token", token)
-                .formParam("action", "LOGOUT")
-                .when()
-                .post("/endpoint")
-                .then()
-                .statusCode(200)
-                .body("result", equalTo("OK"));
+        Response logout = sendAction(token, "LOGOUT");
+        Allure.step("Выход из сессии: ожидаем 200 OK", () -> {
+            logout.then().statusCode(200).body("result", equalTo("OK"));
+        });
 
-        RestAssured.given()
-                .contentType(ContentType.URLENC)
-                .header("X-Api-Key", apiKey)
-                .formParam("token", token)
-                .formParam("action", "ACTION")
-                .when()
-                .post("/endpoint")
-                .then()
-                .statusCode(403)
-                .body("result", equalTo("ERROR"));
+        Response actionAfterLogout = sendAction(token, "ACTION");
+        Allure.step("Попытка действия после LOGOUT: ожидаем 403 ERROR", () -> {
+            actionAfterLogout.then().statusCode(403).body("result", equalTo("ERROR"));
+        });
     }
 
     @Test
@@ -228,14 +202,18 @@ public class InternalApiTest {
     void missingApiKey() {
         String token = randomToken();
 
-        RestAssured.given()
-                .contentType(ContentType.URLENC)
-                .formParam("token", token)
-                .formParam("action", "LOGIN")
-                .when()
-                .post("/endpoint")
-                .then()
-                .statusCode(401);
+        Response response = Allure.step("Отправка запроса без заголовка X-Api-Key", () ->
+                RestAssured.given()
+                        .contentType(ContentType.URLENC)
+                        .formParam("token", token)
+                        .formParam("action", "LOGIN")
+                        .when()
+                        .post("/endpoint")
+        );
+
+        Allure.step("Проверка ответа: ожидаем 401 Unauthorized", () -> {
+            response.then().statusCode(401);
+        });
     }
 
     @Test
@@ -245,14 +223,18 @@ public class InternalApiTest {
     void wrongApiKey() {
         String token = randomToken();
 
-        RestAssured.given()
-                .contentType(ContentType.URLENC)
-                .header("X-Api-Key", "WRONG")
-                .formParam("token", token)
-                .formParam("action", "LOGIN")
-                .when()
-                .post("/endpoint")
-                .then()
-                .statusCode(401);
+        Response response = Allure.step("Отправка запроса с неверным X-Api-Key", () ->
+                RestAssured.given()
+                        .contentType(ContentType.URLENC)
+                        .header("X-Api-Key", "WRONG")
+                        .formParam("token", token)
+                        .formParam("action", "LOGIN")
+                        .when()
+                        .post("/endpoint")
+        );
+
+        Allure.step("Проверка ответа: ожидаем 401 Unauthorized", () -> {
+            response.then().statusCode(401);
+        });
     }
 }
