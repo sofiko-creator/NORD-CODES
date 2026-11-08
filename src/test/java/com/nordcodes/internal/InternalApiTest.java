@@ -66,12 +66,11 @@ public class InternalApiTest {
     }
 
     private void verifyExternalCall(String path, String token) {
-        Allure.step("Проверка, что внешний сервис вызван: " + path, () -> {
-            verify(postRequestedFor(urlEqualTo(path))
-                    .withHeader("Content-Type", containing("application/x-www-form-urlencoded"))
-                    .withHeader("Accept", containing("application/json"))
-                    .withRequestBody(containing("token=" + token)));
-        });
+        Allure.step("Проверка, что внешний сервис вызван: " + path, () ->
+                verify(postRequestedFor(urlEqualTo(path))
+                .withHeader("Content-Type", containing("application/x-www-form-urlencoded"))
+                .withHeader("Accept", containing("application/json"))
+                .withRequestBody(containing("token=" + token))));
     }
 
     private void verifyExternalNotCalled() {
