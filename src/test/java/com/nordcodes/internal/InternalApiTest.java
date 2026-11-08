@@ -9,7 +9,7 @@ import io.restassured.http.ContentType;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 
-import java.util.Random;
+import java.security.SecureRandom;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
 import static org.hamcrest.Matchers.containsString;
@@ -24,7 +24,7 @@ public class InternalApiTest {
     private static String apiKey;
 
     private static final String CHARS = "0123456789ABCDEF";
-    private static final Random RND   = new Random();
+    private static final SecureRandom RND = new SecureRandom();
 
     private static String randomToken() {
         StringBuilder sb = new StringBuilder(32);
@@ -34,7 +34,7 @@ public class InternalApiTest {
 
     @BeforeAll
     static void setUp() {
-        apiKey = Props.get("api-key", "qazWSXedc");
+        apiKey = Props.get("api-key", "default_secret");
 
         RestAssured.baseURI = "http://localhost";
         RestAssured.port = Props.getInt("app-port", 8080);
@@ -75,6 +75,8 @@ public class InternalApiTest {
                 .body("result", equalTo("OK"));
 
         verify(postRequestedFor(urlEqualTo("/auth"))
+                .withHeader("Content-Type", containing("application/x-www-form-urlencoded"))
+                .withHeader("Accept", containing("application/json"))
                 .withRequestBody(containing("token=" + token)));
     }
 
@@ -148,6 +150,8 @@ public class InternalApiTest {
                 .body("result", equalTo("OK"));
 
         verify(postRequestedFor(urlEqualTo("/doAction"))
+                .withHeader("Content-Type", containing("application/x-www-form-urlencoded"))
+                .withHeader("Accept", containing("application/json"))
                 .withRequestBody(containing("token=" + token)));
     }
 

@@ -2,13 +2,11 @@ package com.nordcodes.internal.config;
 
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.client.WireMock;
-import org.junit.jupiter.api.extension.AfterAllCallback;
-import org.junit.jupiter.api.extension.BeforeAllCallback;
-import org.junit.jupiter.api.extension.ExtensionContext;
+import org.junit.jupiter.api.extension.*;
 
 import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.options;
 
-public class WireMockConfig implements BeforeAllCallback, AfterAllCallback {
+public class WireMockConfig implements BeforeAllCallback, AfterAllCallback, BeforeEachCallback {
 
     private WireMockServer wireMockServer;
 
@@ -20,6 +18,11 @@ public class WireMockConfig implements BeforeAllCallback, AfterAllCallback {
         wireMockServer = new WireMockServer(options().port(port));
         wireMockServer.start();
         WireMock.configureFor(host, port);
+    }
+
+    @Override
+    public void beforeEach(ExtensionContext context) {
+        WireMock.resetAllRequests();
     }
 
     @Override
